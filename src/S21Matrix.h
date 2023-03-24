@@ -1,5 +1,5 @@
-#ifndef SRC_S21S21Matrix_H
-#define SRC_S21S21Matrix_H
+#ifndef SRC_S21_MATRIX
+#define SRC_S21_MATRIX
 
 
 class S21Matrix {
@@ -10,21 +10,39 @@ private:
 
     void AllocateMemory();
     void FreeMemory();
+    void CopyMatrix(const S21Matrix &other);
 
 public:
 
     S21Matrix();
     S21Matrix(int rows, int cols);
     ~S21Matrix(); 
-
     S21Matrix(const S21Matrix &other);
     S21Matrix(S21Matrix &&other);
     
-    void SetElemValue(int row, int col, double value);
+    bool operator== (const S21Matrix &other);
+    bool operator!= (const S21Matrix &other);
+    S21Matrix operator+(const S21Matrix &other);
+    S21Matrix operator-(const S21Matrix &other);
+    S21Matrix operator*(const S21Matrix &other);
+    S21Matrix operator*(const double &other);
+    S21Matrix operator+=(const S21Matrix &other);
+    S21Matrix operator-=(const S21Matrix &other);
+    S21Matrix operator*=(const S21Matrix &other);
+    S21Matrix operator*=(const double &other);
+    S21Matrix operator= (const S21Matrix &other);
+
+    S21Matrix transpose();
+    S21Matrix calc_complements();
+    double determinant();
+    S21Matrix minor(int row, int col);
+    S21Matrix inverse_matrix();
+
+    void IndexingMatrixElem(int row, int col, double value);
     void PrintMatrix();
     int GetRows();
     int GetCols();
 };
 
 
-#endif // SRC_S21S21Matrix_H
+#endif // SRC_S21_MATRIX
