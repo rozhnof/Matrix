@@ -1,6 +1,10 @@
 #ifndef SRC_S21_MATRIX
 #define SRC_S21_MATRIX
 
+class MatrixException : public std::exception {
+public:
+private:
+};
 
 class S21Matrix {
 private:
@@ -31,6 +35,9 @@ public:
     S21Matrix operator*=(const S21Matrix &other);
     S21Matrix operator*=(const double &other);
     S21Matrix operator= (const S21Matrix &other);
+
+    bool eq_matrix(const S21Matrix& other);
+    void sum_matrix(const S21Matrix& other);
 
     S21Matrix transpose();
     S21Matrix calc_complements();
