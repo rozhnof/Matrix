@@ -1,10 +1,6 @@
 #ifndef SRC_S21_MATRIX
 #define SRC_S21_MATRIX
 
-class MatrixException : public std::exception {
-public:
-private:
-};
 
 class S21Matrix {
 private:
@@ -38,14 +34,17 @@ public:
 
     bool eq_matrix(const S21Matrix& other);
     void sum_matrix(const S21Matrix& other);
+    void sub_matrix(const S21Matrix& other);
+    void mul_number(const double num);
+    void mul_matrix(const S21Matrix& other);
 
     S21Matrix transpose();
     S21Matrix calc_complements();
-    double determinant();
-    S21Matrix minor(int row, int col);
     S21Matrix inverse_matrix();
+    S21Matrix minor(int row, int col);
+    double determinant();
 
-    void IndexingMatrixElem(int row, int col, double value);
+    void SetValue(int row, int col, double value);
     void PrintMatrix();
     int GetRows();
     int GetCols();

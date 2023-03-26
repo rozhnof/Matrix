@@ -3,26 +3,20 @@
 #include <cmath>
 
 
-S21Matrix::S21Matrix() {
-    _rows = 3;
-    _cols = 3;
-
+S21Matrix::S21Matrix() : _rows(3), _cols(3) {
     AllocateMemory();
 }
 
-S21Matrix::S21Matrix(int rows, int cols) {
+S21Matrix::S21Matrix(int rows, int cols) 
+: _rows(rows), _cols(cols) {
     if (rows <= 0 || cols <= 0) {
         throw std::logic_error("Incorrect matrix size");
     }
-    _rows = rows;
-    _cols = cols; 
     AllocateMemory();
 }
 
 S21Matrix::~S21Matrix() {
     if (_matrix) {
-        _rows = 0;
-        _cols = 0;
         FreeMemory();       
     }
 }
@@ -31,13 +25,10 @@ S21Matrix::S21Matrix(const S21Matrix &other) {
     this->CopyMatrix(other);
 }
 
-S21Matrix::S21Matrix(S21Matrix &&other) {
-    this->_rows = other._rows;
-    this->_cols = other._cols;
-    this->_matrix = other._matrix;
+S21Matrix::S21Matrix(S21Matrix &&other) 
+    : _rows(other._rows), _cols(other._cols), _matrix(other._matrix) {
     other._matrix = nullptr;
 }
-
 
 S21Matrix S21Matrix::operator=(const S21Matrix &other) {
     this->FreeMemory();
@@ -62,6 +53,10 @@ bool S21Matrix::operator!=(const S21Matrix &other) {
     return !(*this == other);
 }
 
+void S21Matrix::sum_matrix(const S21Matrix& other) {
+    *this += other;
+}
+
 S21Matrix S21Matrix::operator+(const S21Matrix &other) {
     if (_rows != other._rows || _cols != other._cols) {
         throw std::logic_error("Incorrect matrix sizes");
@@ -78,6 +73,14 @@ S21Matrix S21Matrix::operator+(const S21Matrix &other) {
     return result;
 }
 
+S21Matrix S21Matrix::operator+=(const S21Matrix &other) {
+    return *this = *this + other;
+}
+
+void S21Matrix::sub_matrix(const S21Matrix& other) {
+    *this -= other;
+}
+
 S21Matrix S21Matrix::operator-(const S21Matrix &other) {
     if (_rows != other._rows || _cols != other._cols) {
         throw std::logic_error("Incorrect matrix sizes");
@@ -92,6 +95,14 @@ S21Matrix S21Matrix::operator-(const S21Matrix &other) {
     }
 
     return result;
+}
+
+S21Matrix S21Matrix::operator-=(const S21Matrix &other) {
+    return *this = *this - other;
+}
+
+void S21Matrix::mul_matrix(const S21Matrix& other) {
+    *this *= other;
 }
 
 S21Matrix S21Matrix::operator*(const S21Matrix &other) {
@@ -112,68 +123,27 @@ S21Matrix S21Matrix::operator*(const S21Matrix &other) {
     return result;
 }
 
-S21Matrix S21Matrix::operator*(const double &other) {
+S21Matrix S21Matrix::operator*=(const S21Matrix &other) {
+    return *this = *this * other;
+}
+
+void S21Matrix::mul_number(const double num) {
+    *this *= num;
+}
+
+S21Matrix S21Matrix::operator*(const double &num) {
     S21Matrix result = *this;
 
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
-            result._matrix[i][j] *= other;
+            result._matrix[i][j] *= num;
         }
     }
     return result;
 }
 
-S21Matrix S21Matrix::operator+=(const S21Matrix &other) {
-    if (_rows != other._rows || _cols != other._cols) {
-        throw std::logic_error("Incorrect matrix sizes");
-    }
-
-    for (int i = 0; i < _rows; i++) {
-        for (int j = 0; j < _cols; j++) {
-            this->_matrix[i][j] += other._matrix[i][j];
-        }
-    }
-
-    return *this;
-}
-
-S21Matrix S21Matrix::operator-=(const S21Matrix &other) {
-    if (_rows != other._rows || _cols != other._cols) {
-        throw std::logic_error("Incorrect matrix sizes");
-    }
-
-    for (int i = 0; i < _rows; i++) {
-        for (int j = 0; j < _cols; j++) {
-            this->_matrix[i][j] -= other._matrix[i][j];
-        }
-    }
-
-    return *this;
-}
-
-S21Matrix S21Matrix::operator*=(const S21Matrix &other) {
-    if (this->_rows == other._cols) {
-        throw std::logic_error("Incorrect matrix sizes");
-    }
-
-    for (int i = 0; i < _rows; i++) {
-        for (int j = 0; j < _cols; j++) {
-            for (int k = 0; k < this->_cols; k++) {
-                this->_matrix[i][j] += this->_matrix[i][k] * other._matrix[k][j];
-            }
-        }
-    }
-
-    return *this;
-}
-
-S21Matrix S21Matrix::operator*=(const double &other) {
-    for (int i = 0; i < _rows; i++) {
-        for (int j = 0; j < _cols; j++) {
-            this->_matrix[i][j] *= other;
-        }
-    }
-    return *this;
+S21Matrix S21Matrix::operator*=(const double &num) {
+    return *this = *this * num;
 }
 
 void S21Matrix::AllocateMemory() {
@@ -202,7 +172,7 @@ void S21Matrix::PrintMatrix() {
     }
 }
 
-void S21Matrix::IndexingMatrixElem(int row, int col, double value) {
+void S21Matrix::SetValue(int row, int col, double value) {
     if (row >= 0 && row <= _rows && col >= 0 && col <= _cols) {
         _matrix[row][col] = value;
     }
@@ -232,11 +202,13 @@ S21Matrix S21Matrix::transpose() {
 }
 
 S21Matrix S21Matrix::calc_complements() {
-    S21Matrix result(_rows, _cols);
-
     if (_rows != _cols) {
         throw std::logic_error("Not square matrix");
+    } else if (this->determinant() == 0) {
+        throw std::logic_error("Determinant is zero");
     }
+
+    S21Matrix result(_rows, _cols);
 
     for (int i = 0; i < _rows; i++) {
         for (int j = 0; j < _cols; j++) {
@@ -251,11 +223,11 @@ S21Matrix S21Matrix::calc_complements() {
 }
 
 double S21Matrix::determinant() {
-    double result = 0;
-
     if (_rows != _cols) {
         throw std::logic_error("Not square matrix");
     }
+
+    double result = 0;
 
     if (_rows > 1) {
       for (int j = 0; j < _cols; j++) {
@@ -271,9 +243,15 @@ double S21Matrix::determinant() {
 }
 
 S21Matrix S21Matrix::minor(int row, int col) {
+    if (_rows != _cols) {
+        throw std::logic_error("Not square matrix");
+    } else if (row > _rows || col > _cols || row < 0 || col < 0) {
+        throw std::logic_error("Incorrect values");
+    }
+
     S21Matrix result(_rows - 1, _cols - 1);
 
-    if (row <= _rows && col <= _cols && _rows > 1 && _cols > 1) {
+    if (_rows > 1 && _cols > 1) {
         for (int i = 0, ri = 0; ri < result._rows; i++, ri++) {
             if (i == row) {
                 i++;
@@ -285,7 +263,7 @@ S21Matrix S21Matrix::minor(int row, int col) {
                 result._matrix[ri][rj] = _matrix[i][j];
             }
         }
-    } else if (row <= _rows && col <= _cols) {
+    } else {
         result._matrix[0][0] = 1;
     }
 
@@ -293,12 +271,11 @@ S21Matrix S21Matrix::minor(int row, int col) {
 }
 
 S21Matrix S21Matrix::inverse_matrix() {
-
-    S21Matrix result = *this;
-
     if (_rows != _cols) {
         throw std::logic_error("Not square matrix");
     }
+
+    S21Matrix result = *this;
 
     if (this->determinant() != 0) {
         result = result.calc_complements();
@@ -322,21 +299,5 @@ bool S21Matrix::eq_matrix(const S21Matrix& other) {
 }
 
 int main() {
-   
-    try{
-        S21Matrix A(-1, 3);    
-    } catch(const std::exception& e){
-        std::cerr<<e.what()<<std::endl;
-    }
-
-    // S21Matrix A(2,2);
-    // A.IndexingMatrixElem(0,0,5);    
-    // A.IndexingMatrixElem(0,1,453);    
-    // A.IndexingMatrixElem(1,0,63);    
-    // A.IndexingMatrixElem(1,1,37);    
-
-    // A.PrintMatrix();
-    // A.inverse_matrix();
-    // A.PrintMatrix();
-
+    S21Matrix A(3, 3);    
 }
