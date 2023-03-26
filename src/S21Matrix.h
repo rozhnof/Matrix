@@ -14,6 +14,10 @@ private:
 
 public:
 
+void S21Matrix::SumElems();
+void S21Matrix::EnumOper(void(*oper)());
+
+
     S21Matrix();
     S21Matrix(int rows, int cols);
     ~S21Matrix(); 
@@ -37,6 +41,8 @@ public:
     void sub_matrix(const S21Matrix& other);
     void mul_number(const double num);
     void mul_matrix(const S21Matrix& other);
+
+
 
     S21Matrix transpose();
     S21Matrix calc_complements();
