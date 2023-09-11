@@ -4,9 +4,9 @@
 
 class S21Matrix {
 private:
-    int _rows;
-    int _cols;
-    double **_matrix;
+    int rows_;
+    int cols_;
+    double **matrix_;
 
     void AllocateMemory();
     void FreeMemory();
@@ -14,8 +14,8 @@ private:
 
 public:
 
-void S21Matrix::SumElems();
-void S21Matrix::EnumOper(void(*oper)());
+    void S21Matrix::SumElems();
+    void S21Matrix::EnumOper(void(*oper)());
 
 
     S21Matrix();
