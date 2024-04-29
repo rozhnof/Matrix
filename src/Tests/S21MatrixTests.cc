@@ -1,7 +1,7 @@
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <cmath>
-#include "../Lib/S21Matrix.h"
+#include "../lib/S21Matrix.h"
 
 
 void fillMatrix(S21Matrix& matrix) {
