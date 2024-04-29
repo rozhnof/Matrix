@@ -1,4 +1,4 @@
-NAME = S21Matrix
+NAME = Matrix
 
 CPP = g++
 LD = ld

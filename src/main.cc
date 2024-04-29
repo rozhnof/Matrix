@@ -1,7 +1,7 @@
-#include "./lib/S21Matrix.h"
+#include "./lib/matrix.h"
 
 int main() {
-    S21Matrix<double> m;
+    Matrix<double> m;
 
 
 }
