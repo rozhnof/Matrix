@@ -6,6 +6,7 @@
 #include <type_traits>
 
 
+
 template <typename T, typename Allocator = std::allocator<T>>
 class Matrix {
  public:
@@ -15,7 +16,8 @@ class Matrix {
   Matrix() noexcept(noexcept(AllocatorType()))
       : rows_(0),
         cols_(0),
-        matrix_(nullptr) {
+        matrix_(nullptr),
+        alloc_(AllocatorType()) {
   }
 
   explicit Matrix(const AllocatorType& alloc) noexcept
@@ -26,12 +28,7 @@ class Matrix {
   }
 
   Matrix(size_t rows, size_t cols, const AllocatorType& alloc = AllocatorType())
-      : rows_(rows),
-        cols_(cols),
-        matrix_(nullptr),
-        alloc_(alloc) {
-    CheckMatrix();
-    ConstructMatrix();
+      : Matrix(rows, cols, T{}, alloc) {
   }
 
   Matrix(size_t rows, size_t cols, const T& value, const AllocatorType& alloc = AllocatorType())
@@ -40,7 +37,16 @@ class Matrix {
         matrix_(nullptr),
         alloc_(alloc) {
     CheckMatrix();
-    ConstructMatrix();
+    size_t i = 0;
+    try {
+      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
+      for (; i < rows_ * cols_; ++i) {
+        AllocatorTraits::construct(alloc_, matrix_ + i, value);
+      }
+    } catch(...) {
+      DestroyMatrix(i);
+      throw;
+    }
   }
 
   Matrix(const Matrix& other): Matrix(other, other.GetAllocator()) {}
@@ -50,7 +56,16 @@ class Matrix {
         cols_(other.cols_),
         matrix_(nullptr),
         alloc_(AllocatorTraits::select_on_container_copy_construction(alloc)) {
-    ConstructMatrix();
+    size_t i = 0;
+    try {
+      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
+      for (; i < rows_ * cols_; ++i) {
+        AllocatorTraits::construct(alloc_, matrix_ + i, other.matrix_[i]);
+      }
+    } catch(...) {
+      DestroyMatrix(i);
+      throw;
+    }
   }
 
   Matrix& operator=(const Matrix& other) {
@@ -98,29 +113,6 @@ class Matrix {
     }
   }
 
-  void ConstructMatrix() {
-    size_t i = 0;
-    try {
-        matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
-        for (; i < rows_ * cols_; ++i) {
-            AllocatorTraits::construct(alloc_, matrix_ + i/*, other.matrix_[i] */);
-        }
-    } catch(...) {
-        DestroyMatrix(i);
-        throw;
-    }
-  }
-
-  void DestroyMatrix(int count_constructed_elements) noexcept {
-    for (size_t i = 0; i < count_constructed_elements; ++i) {
-        AllocatorTraits::destroy(alloc_, matrix_ + i);
-    }
-    AllocatorTraits::deallocate(alloc_, matrix_, rows_ * cols_);
-    matrix_ = nullptr;
-    rows_ = 0;
-    cols_ = 0;
-  }
-
   ~Matrix() {
     DestroyMatrix(rows_ * cols_);
   }
@@ -132,14 +124,9 @@ class Matrix {
     }
   }
 
-  void SwapFields(Matrix& other) noexcept {
-    std::swap(rows_, other.rows_);
-    std::swap(cols_, other.cols_);
-    std::swap(matrix_, other.matrix_);
-  }
-
   Matrix& operator+=(const Matrix& other) {
-    for (int i = 0; i < rows_ * cols_; ++i) {
+    CheckEqualMatrix(other);
+    for (size_t i = 0; i < rows_ * cols_; ++i) {
         matrix_[i] += other.matrix_[i];
     }
     return *this;
@@ -153,11 +140,8 @@ class Matrix {
 
   Matrix& operator-=(const Matrix& other) {
     CheckEqualMatrix(other);
-
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
-        (*this)[i][j] -= other[i][j];
-      }
+    for (size_t i = 0; i < rows_ * cols_; ++i) {
+        matrix_[i] -= other.matrix_[i];
     }
     return *this;
   }
@@ -168,18 +152,15 @@ class Matrix {
     return result;
   }
 
-  Matrix& operator*=(const T value) {
+  Matrix& operator*=(const T& value) {
     CheckMatrix();
-
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
-        (*this)[i][j] *= value;
-      }
+    for (size_t i = 0; i < rows_ * cols_; ++i) {
+        matrix_[i] *= value;
     }
     return *this;
   }
 
-  Matrix operator*(const T value) const {
+  Matrix operator*(const T& value) const {
     Matrix result(*this);
     result *= value;
     return result;
@@ -188,9 +169,9 @@ class Matrix {
   Matrix& operator*=(const Matrix& other) {
     CheckMatrixForMul(other);
 
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
-        for (int k = 0; k < cols_; ++k) {
+    for (size_t i = 0; i < rows_; ++i) {
+      for (size_t j = 0; j < cols_; ++j) {
+        for (size_t k = 0; k < cols_; ++k) {
           (*this)[i][j] *= (*this)[i][k] * other[k][j];
         }
       }
@@ -209,8 +190,8 @@ class Matrix {
       return false;
     }
 
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
+    for (size_t i = 0; i < rows_; ++i) {
+      for (size_t j = 0; j < cols_; ++j) {
         if (matrix_[i] == other.matrix_[i]) {
           return false;
         }
@@ -223,12 +204,22 @@ class Matrix {
     return !(*this == other);
   }
 
-  const T* operator[](size_t row) const {
-    return matrix_[row];
+  T* operator[](size_t row) {
+    return matrix_[row * cols_];
   }
 
-  T* operator[](size_t row) {
-    return matrix_[row];
+  const T* operator[](size_t row) const {
+    return matrix_[row * cols_];
+  }
+
+  T& at(size_t row, size_t col) {
+    CheckIndex(row, col);
+    return matrix_[row][col];
+  }
+
+  const T& at(size_t row, size_t col) const {
+    CheckIndex(row, col);
+    return matrix_[row][col];
   }
 
   void SetRows(size_t rows) {
@@ -245,12 +236,8 @@ class Matrix {
     }
 
     Matrix new_matrix(rows, cols);
-
-    size_t min_rows = std::min(rows, rows_);
-    size_t min_cols = std::min(cols, cols_);
-
-    for (size_t i = 0; i < min_rows; ++i) {
-      for (size_t j = 0; j < min_cols; ++j) {
+    for (size_t i = 0; i < std::min(rows, rows_); ++i) {
+      for (size_t j = 0; j < std::min(cols, cols_); ++j) {
         new_matrix[i][j] = (*this)[i][j];
       }
     }
@@ -269,8 +256,8 @@ class Matrix {
   Matrix Transpose() const {
     Matrix transpose_matrix(cols_, rows_);
 
-    for (int i = 0; i < cols_; ++i) {
-      for (int j = 0; j < rows_; ++j) {
+    for (size_t i = 0; i < cols_; ++i) {
+      for (size_t j = 0; j < rows_; ++j) {
         transpose_matrix[i][j] = (*this)[j][i];
       }
     }
@@ -287,8 +274,8 @@ class Matrix {
 
     Matrix calc_complements_matrix(rows_, cols_);
 
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
+    for (size_t i = 0; i < rows_; ++i) {
+      for (size_t j = 0; j < cols_; ++j) {
         calc_complements_matrix[i][j] =
             Minor(i, j).Determinant() * GetCalcComplementSign(i, j);
       }
@@ -315,12 +302,12 @@ class Matrix {
       return minor_matrix;
     }
 
-    for (int i = 0, minor_i = 0; i < rows_ && minor_i < minor_matrix.rows_;
+    for (size_t i = 0, minor_i = 0; i < rows_ && minor_i < minor_matrix.rows_;
          ++i, ++minor_i) {
       if (i == row) {
         ++i;
       }
-      for (int j = 0, minor_j = 0; j < cols_ && minor_j < minor_matrix.cols_;
+      for (size_t j = 0, minor_j = 0; j < cols_ && minor_j < minor_matrix.cols_;
            ++j, ++minor_j) {
         if (j == col) {
           ++j;
@@ -341,12 +328,28 @@ class Matrix {
       return (*this)[0][0];
     }
 
-    for (int j = 0; j < cols_; ++j) {
-      determinant += Minor(0, j).Determinant() * GetCalcComplementSign(0, j) *
-                     (*this)[0][j];
+    for (size_t j = 0; j < cols_; ++j) {
+      determinant += Minor(0, j).Determinant() * GetCalcComplementSign(0, j) * (*this)[0][j];
     }
 
     return determinant;
+  }
+
+private:
+  void DestroyMatrix(int count_constructed_elements) noexcept {
+    for (size_t i = 0; i < count_constructed_elements; ++i) {
+        AllocatorTraits::destroy(alloc_, matrix_ + i);
+    }
+    AllocatorTraits::deallocate(alloc_, matrix_, rows_ * cols_);
+    matrix_ = nullptr;
+    rows_ = 0;
+    cols_ = 0;
+  }
+
+  void SwapFields(Matrix& other) noexcept {
+    std::swap(rows_, other.rows_);
+    std::swap(cols_, other.cols_);
+    std::swap(matrix_, other.matrix_);
   }
 
   int GetCalcComplementSign(size_t i, size_t j) const {
@@ -377,6 +380,12 @@ class Matrix {
     }
   }
 
+  void CheckIndex(size_t row, size_t col) const {
+    if (row <= 0 || row >= rows_ || col <= 0 || col >= cols_) {
+      throw std::out_of_range("Indexes out of range");
+    }
+  }
+
   AllocatorType GetAllocator() const noexcept {
     return alloc_;
   }
@@ -390,11 +399,11 @@ class Matrix {
 
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& matrix) {
-  for (int i = 0; i < matrix.GetRows(); ++i) {
-    for (int j = 0; j < matrix.GetCols(); ++j) {
-      os << matrix[i][j] << " ";
+  for (size_t i = 0; i < matrix.GetRows(); ++i) {
+    for (size_t j = 0; j < matrix.GetCols(); ++j) {
+      os << matrix[i][j] << ' ';
     }
-    os << std::endl;
+    os << '\n';
   }
 
   return os;
