@@ -5,128 +5,142 @@
 #include <iostream>
 #include <type_traits>
 
+
 template <typename T, typename Allocator = std::allocator<T>>
 class Matrix {
  public:
-  using value_type = T;
-  using size_type = std::size_t;
-  using allocator_type = Allocator;
-  using allocator_traits = std::allocator_traits<allocator_type>;
-  using reference = value_type&;
-  using const_reference = const value_type&;
+  using AllocatorType = Allocator;
+  using AllocatorTraits = std::allocator_traits<AllocatorType>;
 
-  // using iterator = Iterator<Value, false>;
-  // using const_iterator = Iterator<Value, true>;
-  // using reverse_iterator = std::reverse_iterator<iterator>;
-  // using const_reverse_iterator = std::reverse_iterator<const_iterator>;
-
-  Matrix() noexcept(noexcept(allocator_type()))
+  Matrix() noexcept(noexcept(AllocatorType()))
       : rows_(0),
         cols_(0),
         matrix_(nullptr) {
   }
 
-  constexpr explicit Matrix(const allocator_type& alloc) noexcept : Matrix() {
-    alloc_ = alloc;
+  explicit Matrix(const AllocatorType& alloc) noexcept
+      : rows_(0),
+        cols_(0),
+        matrix_(nullptr),
+        alloc_(alloc) {
   }
 
-  Matrix(size_type rows, size_type cols, const allocator_type& alloc = allocator_type())
+  Matrix(size_t rows, size_t cols, const AllocatorType& alloc = AllocatorType())
       : rows_(rows),
         cols_(cols),
         matrix_(nullptr),
         alloc_(alloc) {
-    checkMatrix();
-    
-    size_type i = 0;
-    try {
-        matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
-        for (; i < rows_ * cols_; ++i) {
-            allocator_traits::construct(alloc_, matrix_ + i);
-        }
-    } catch(...) {
-        for (int j = 0; j < i; ++j) {
-            allocator_traits::destroy(alloc_, matrix_ + j);
-        }
-        allocator_traits::deallocate(alloc_, matrix_, rows_ * cols_);
-        throw;
-    }
+    CheckMatrix();
+    ConstructMatrix();
   }
 
-  Matrix(size_type rows, size_type cols, const value_type& value, const allocator_type& alloc = allocator_type())
+  Matrix(size_t rows, size_t cols, const T& value, const AllocatorType& alloc = AllocatorType())
       : rows_(rows),
         cols_(cols),
         matrix_(nullptr),
         alloc_(alloc) {
-    checkMatrix();
-    
-    size_type i = 0;
-    try {
-        matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
-        for (; i < rows_ * cols_; ++i) {
-            allocator_traits::construct(alloc_, matrix_ + i, value);
-        }
-    } catch(...) {
-        for (int j = 0; j < i; ++j) {
-            allocator_traits::destroy(alloc_, matrix_ + j);
-        }
-        allocator_traits::deallocate(alloc_, matrix_, rows_ * cols_);
-        throw;
-    }
+    CheckMatrix();
+    ConstructMatrix();
   }
 
-  Matrix(const Matrix& other)
+  Matrix(const Matrix& other): Matrix(other, other.GetAllocator()) {}
+
+  Matrix(const Matrix& other, const AllocatorType& alloc)
       : rows_(other.rows_),
         cols_(other.cols_),
         matrix_(nullptr),
-        alloc_(allocator_traits::select_on_container_copy_construction(other.GetAllocator())) {
-    checkMatrix();
+        alloc_(AllocatorTraits::select_on_container_copy_construction(alloc)) {
+    ConstructMatrix();
+  }
 
-    size_type i = 0;
+  Matrix& operator=(const Matrix& other) {
+    if (this == &other) {
+      return *this;
+    }
+
+    Matrix copy(other); 
+    SwapFields(copy);
+    alloc_ = copy.alloc_;  
+  }
+
+  Matrix(Matrix&& other) noexcept(noexcept(AllocatorType()))
+      : Matrix() {
+    SwapFields(other);
+    alloc_ = std::move(other.alloc_);
+  }
+
+  Matrix(Matrix&& other, const AllocatorType& alloc)
+      : Matrix() {
+    if constexpr (AllocatorTraits::is_always_equal::value) {
+      SwapFields(other);
+    } else {
+      Matrix copy(other); 
+      SwapFields(copy);
+    }
+    alloc_ = alloc;
+  }
+
+  Matrix& operator=(Matrix&& other) noexcept(
+      AllocatorTraits::propagate_on_container_move_assignment::value && 
+      AllocatorTraits::is_always_equal::value) {
+    if (this == &other) {
+      return *this;
+    }
+
+    if constexpr (AllocatorTraits::propagate_on_container_move_assignment::value) {
+      DestroyMatrix();
+      SwapFields(other);
+      alloc_ = std::move(other.alloc_);
+    } else {
+      Matrix copy(other); 
+      SwapFields(copy);
+      alloc_ = copy.alloc_;  
+    }
+  }
+
+  void ConstructMatrix() {
+    size_t i = 0;
     try {
-        matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
+        matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
         for (; i < rows_ * cols_; ++i) {
-            allocator_traits::construct(alloc_, matrix_ + i, other.matrix_[i]);
+            AllocatorTraits::construct(alloc_, matrix_ + i/*, other.matrix_[i] */);
         }
     } catch(...) {
-        for (int j = 0; j < i; ++j) {
-            allocator_traits::destroy(alloc_, matrix_ + j);
-        }
-        allocator_traits::deallocate(alloc_, matrix_, rows_ * cols_);
+        DestroyMatrix(i);
         throw;
     }
   }
 
-  Matrix(Matrix&& other)
-      : Matrix() {
-    swap(other);
+  void DestroyMatrix(int count_constructed_elements) noexcept {
+    for (size_t i = 0; i < count_constructed_elements; ++i) {
+        AllocatorTraits::destroy(alloc_, matrix_ + i);
+    }
+    AllocatorTraits::deallocate(alloc_, matrix_, rows_ * cols_);
+    matrix_ = nullptr;
+    rows_ = 0;
+    cols_ = 0;
   }
 
   ~Matrix() {
-    for (size_type i = 0; i < rows_ * cols_; ++i) {
-        allocator_traits::destroy(alloc_, matrix_ + i);
-    }
-    allocator_traits::deallocate(alloc_, matrix_, rows_ * cols_);
+    DestroyMatrix(rows_ * cols_);
   }
 
-  void swap(Matrix& other) {
+  void Swap(Matrix& other) noexcept(AllocatorTraits::is_always_equal::value) {
+    SwapFields(other);
+    if constexpr (AllocatorTraits::propagate_on_container_swap::value) {
+      std::swap(alloc_, other.alloc_);
+    }
+  }
+
+  void SwapFields(Matrix& other) noexcept {
     std::swap(rows_, other.rows_);
     std::swap(cols_, other.cols_);
     std::swap(matrix_, other.matrix_);
   }
 
-  Matrix& operator=(const Matrix& other) {
-    Matrix copy(other);
-    swap(copy);
-    return *this;
-  }
-
   Matrix& operator+=(const Matrix& other) {
-    checkEqualMatrix(other);
-
-    for (int i = 0; i < rows_; ++i) {
-      for (int j = 0; j < cols_; ++j) {
-        (*this)[i][j] += other[i][j];
-      }
+    for (int i = 0; i < rows_ * cols_; ++i) {
+        matrix_[i] += other.matrix_[i];
     }
     return *this;
   }
@@ -138,7 +152,7 @@ class Matrix {
   }
 
   Matrix& operator-=(const Matrix& other) {
-    checkEqualMatrix(other);
+    CheckEqualMatrix(other);
 
     for (int i = 0; i < rows_; ++i) {
       for (int j = 0; j < cols_; ++j) {
@@ -155,7 +169,7 @@ class Matrix {
   }
 
   Matrix& operator*=(const T value) {
-    checkMatrix();
+    CheckMatrix();
 
     for (int i = 0; i < rows_; ++i) {
       for (int j = 0; j < cols_; ++j) {
@@ -172,7 +186,7 @@ class Matrix {
   }
 
   Matrix& operator*=(const Matrix& other) {
-    checkMatrixForMul(other);
+    CheckMatrixForMul(other);
 
     for (int i = 0; i < rows_; ++i) {
       for (int j = 0; j < cols_; ++j) {
@@ -197,7 +211,7 @@ class Matrix {
 
     for (int i = 0; i < rows_; ++i) {
       for (int j = 0; j < cols_; ++j) {
-        if (std::abs((*this)[i][j]) - std::abs(other[i][j]) > 1e-6) {
+        if (matrix_[i] == other.matrix_[i]) {
           return false;
         }
       }
@@ -209,46 +223,46 @@ class Matrix {
     return !(*this == other);
   }
 
-  const T* operator[](size_type row) const {
+  const T* operator[](size_t row) const {
     return matrix_[row];
   }
 
-  T* operator[](size_type row) {
+  T* operator[](size_t row) {
     return matrix_[row];
   }
 
-  void setRows(size_type rows) {
-    resize(rows, cols_);
+  void SetRows(size_t rows) {
+    Resize(rows, cols_);
   }
 
-  void setCols(size_type cols) {
-    resize(rows_, cols);
+  void SetCols(size_t cols) {
+    Resize(rows_, cols);
   }
 
-  void resize(size_type rows, size_type cols) {
+  void Resize(size_t rows, size_t cols) {
     if (rows == rows_ && cols == cols_) {
       return;
     }
 
     Matrix new_matrix(rows, cols);
 
-    int min_rows = std::min(rows, rows_);
-    int min_cols = std::min(cols, cols_);
+    size_t min_rows = std::min(rows, rows_);
+    size_t min_cols = std::min(cols, cols_);
 
-    for (int i = 0; i < min_rows; ++i) {
-      for (int j = 0; j < min_cols; ++j) {
+    for (size_t i = 0; i < min_rows; ++i) {
+      for (size_t j = 0; j < min_cols; ++j) {
         new_matrix[i][j] = (*this)[i][j];
       }
     }
 
-    swap(new_matrix);
+    Swap(new_matrix);
   }
 
-  int getRows() const {
+  int GetRows() const {
     return rows_;
   }
 
-  int getCols() const {
+  int GetCols() const {
     return cols_;
   }
 
@@ -265,7 +279,7 @@ class Matrix {
   }
 
   Matrix CalcComplements() const {
-    checkSquareMatrix();
+    CheckSquareMatrix();
 
     if (Determinant() == 0) {
       throw std::invalid_argument("Determinant is equal to 0");
@@ -276,7 +290,7 @@ class Matrix {
     for (int i = 0; i < rows_; ++i) {
       for (int j = 0; j < cols_; ++j) {
         calc_complements_matrix[i][j] =
-            Minor(i, j).Determinant() * getCalcComplementSign(i, j);
+            Minor(i, j).Determinant() * GetCalcComplementSign(i, j);
       }
     }
 
@@ -284,15 +298,15 @@ class Matrix {
   }
 
   Matrix InverseMatrix() const {
-    checkSquareMatrix();
+    CheckSquareMatrix();
 
     Matrix inverse_matrix(*this);
     inverse_matrix *= 1 / CalcComplements().Transpose().Determinant();
     return inverse_matrix;
   }
 
-  Matrix Minor(size_type row, size_type col) const {
-    checkSquareMatrix();
+  Matrix Minor(size_t row, size_t col) const {
+    CheckSquareMatrix();
 
     Matrix minor_matrix(rows_ - 1, cols_ - 1);
 
@@ -319,8 +333,8 @@ class Matrix {
   }
 
   T Determinant() const {
-    checkMatrix();
-    checkSquareMatrix();
+    CheckMatrix();
+    CheckSquareMatrix();
 
     T determinant = 0;
     if (rows_ == 1) {
@@ -328,56 +342,56 @@ class Matrix {
     }
 
     for (int j = 0; j < cols_; ++j) {
-      determinant += Minor(0, j).Determinant() * getCalcComplementSign(0, j) *
+      determinant += Minor(0, j).Determinant() * GetCalcComplementSign(0, j) *
                      (*this)[0][j];
     }
 
     return determinant;
   }
 
-  int getCalcComplementSign(size_type i, size_type j) const {
+  int GetCalcComplementSign(size_t i, size_t j) const {
     return (((i + j) % 2) == 1 ? -1 : 1);
   }
 
-  void checkMatrix() const {
+  void CheckMatrix() const {
     if (rows_ < 1 || cols_ < 1) {
       throw std::invalid_argument("Matrix size is less than 1");
     }
   }
 
-  void checkSquareMatrix() const {
+  void CheckSquareMatrix() const {
     if (rows_ != cols_) {
       throw std::invalid_argument("Matrix is not square");
     }
   }
 
-  void checkEqualMatrix(const Matrix& other) const {
+  void CheckEqualMatrix(const Matrix& other) const {
     if (rows_ != other.rows_ || cols_ != other.cols_) {
       throw std::invalid_argument("Matrix size is not equal");
     }
   }
 
-  void checkMatrixForMul(const Matrix& other) const {
+  void CheckMatrixForMul(const Matrix& other) const {
     if (cols_ != other.rows_) {
       throw std::invalid_argument("Incorrect matrices for multiplication");
     }
   }
 
-  allocator_type GetAllocator() const noexcept {
+  AllocatorType GetAllocator() const noexcept {
     return alloc_;
   }
 
  private:
-  size_type rows_;
-  size_type cols_;
+  size_t rows_;
+  size_t cols_;
   T* matrix_;
-  [[no_unique_address]] allocator_type alloc_;
+  [[no_unique_address]] AllocatorType alloc_;
 };
 
 template <typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& matrix) {
-  for (int i = 0; i < matrix.getRows(); ++i) {
-    for (int j = 0; j < matrix.getCols(); ++j) {
+  for (int i = 0; i < matrix.GetRows(); ++i) {
+    for (int j = 0; j < matrix.GetCols(); ++j) {
       os << matrix[i][j] << " ";
     }
     os << std::endl;
