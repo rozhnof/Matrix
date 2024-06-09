@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
+#include <initializer_list>
 #include <ostream>
 #include <memory>
 #include <iostream>
@@ -12,6 +14,7 @@ class Matrix {
  public:
   using AllocatorType = Allocator;
   using AllocatorTraits = std::allocator_traits<AllocatorType>;
+  using size_t = std::size_t;
 
   Matrix() noexcept(noexcept(AllocatorType()))
       : rows_(0),
@@ -31,6 +34,32 @@ class Matrix {
       : Matrix(rows, cols, T{}, alloc) {
   }
 
+  constexpr Matrix(std::initializer_list<std::initializer_list<T>> init_list)
+      : rows_(init_list.size()), 
+      cols_(std::max_element(init_list.begin(), init_list.end(), [](auto& il1, auto& il2) {
+        return il1.size() < il2.size();
+      })->size()),
+      matrix_(nullptr),
+      alloc_(AllocatorType()) {
+
+    size_t i = 0;
+    try {
+      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
+      for (; i < rows_ * cols_; ++i) {
+        auto rows_it = init_list.begin() + i / cols_;
+        auto cols_it = rows_it->begin() + i % cols_;
+        if (cols_it < rows_it->end()) {
+          AllocatorTraits::construct(alloc_, matrix_ + i, *cols_it);
+        } else {
+          AllocatorTraits::construct(alloc_, matrix_ + i, T{});
+        }
+      }
+    } catch(...) {
+      DestroyMatrix(i);
+      throw;
+    }
+  }
+
   Matrix(size_t rows, size_t cols, const T& value, const AllocatorType& alloc = AllocatorType())
       : rows_(rows),
         cols_(cols),
@@ -39,8 +68,8 @@ class Matrix {
     CheckMatrix();
 
     size_t i = 0;
-    matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
     try {
+      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         AllocatorTraits::construct(alloc_, matrix_ + i, value);
       }
@@ -58,8 +87,8 @@ class Matrix {
         matrix_(nullptr),
         alloc_(AllocatorTraits::select_on_container_copy_construction(alloc)) {
     size_t i = 0;
-    matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
     try {
+      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         AllocatorTraits::construct(alloc_, matrix_ + i, other.matrix_[i]);
       }
