@@ -266,7 +266,7 @@ class Matrix {
     return new_matrix;
   }
 
-  Matrix CalcComplements() const {
+  Matrix CalcComplements() const requires(std::is_arithmetic_v<T>) {
     CheckSquareMatrix();
 
     if (Determinant() == 0) {
@@ -283,7 +283,7 @@ class Matrix {
     return new_matrix;
   }
 
-  Matrix InverseMatrix() const {
+  Matrix InverseMatrix() const requires(std::is_arithmetic_v<T>) {
     CheckSquareMatrix();
 
     Matrix new_matrix(*this);
@@ -319,7 +319,7 @@ class Matrix {
     return minor_matrix;
   }
 
-  T Determinant() const {
+  T Determinant() const requires(std::is_arithmetic_v<T>) {
     CheckMatrix();
     CheckSquareMatrix();
 
