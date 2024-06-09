@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <ostream>
 #include <memory>
 #include <iostream>
 #include <type_traits>
-
 
 
 template <typename T, typename Allocator = std::allocator<T>>
@@ -37,9 +37,10 @@ class Matrix {
         matrix_(nullptr),
         alloc_(alloc) {
     CheckMatrix();
+
     size_t i = 0;
+    matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
     try {
-      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         AllocatorTraits::construct(alloc_, matrix_ + i, value);
       }
@@ -57,8 +58,8 @@ class Matrix {
         matrix_(nullptr),
         alloc_(AllocatorTraits::select_on_container_copy_construction(alloc)) {
     size_t i = 0;
+    matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
     try {
-      matrix_ = AllocatorTraits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         AllocatorTraits::construct(alloc_, matrix_ + i, other.matrix_[i]);
       }
@@ -68,7 +69,7 @@ class Matrix {
     }
   }
 
-  Matrix& operator=(const Matrix& other) {
+  Matrix& operator=(const Matrix& other) { // ???
     if (this == &other) {
       return *this;
     }
@@ -78,13 +79,13 @@ class Matrix {
     alloc_ = copy.alloc_;  
   }
 
-  Matrix(Matrix&& other) noexcept(noexcept(AllocatorType()))
+  Matrix(Matrix&& other) noexcept(noexcept(AllocatorType())) // ???
       : Matrix() {
     SwapFields(other);
     alloc_ = std::move(other.alloc_);
   }
 
-  Matrix(Matrix&& other, const AllocatorType& alloc)
+  Matrix(Matrix&& other, const AllocatorType& alloc) // ???
       : Matrix() {
     if constexpr (AllocatorTraits::is_always_equal::value) {
       SwapFields(other);
@@ -95,7 +96,7 @@ class Matrix {
     alloc_ = alloc;
   }
 
-  Matrix& operator=(Matrix&& other) noexcept(
+  Matrix& operator=(Matrix&& other) noexcept( // ???
       AllocatorTraits::propagate_on_container_move_assignment::value && 
       AllocatorTraits::is_always_equal::value) {
     if (this == &other) {
@@ -117,7 +118,7 @@ class Matrix {
     DestroyMatrix(rows_ * cols_);
   }
 
-  void Swap(Matrix& other) noexcept(AllocatorTraits::is_always_equal::value) {
+  void Swap(Matrix& other) noexcept(AllocatorTraits::is_always_equal::value) { // ???
     SwapFields(other);
     if constexpr (AllocatorTraits::propagate_on_container_swap::value) {
       std::swap(alloc_, other.alloc_);
@@ -168,7 +169,6 @@ class Matrix {
 
   Matrix& operator*=(const Matrix& other) {
     CheckMatrixForMul(other);
-
     for (size_t i = 0; i < rows_; ++i) {
       for (size_t j = 0; j < cols_; ++j) {
         for (size_t k = 0; k < cols_; ++k) {
@@ -192,11 +192,12 @@ class Matrix {
 
     for (size_t i = 0; i < rows_; ++i) {
       for (size_t j = 0; j < cols_; ++j) {
-        if (matrix_[i] == other.matrix_[i]) {
+        if (matrix_[i] != other.matrix_[i]) {
           return false;
         }
       }
     }
+
     return true;
   }
 
@@ -205,21 +206,21 @@ class Matrix {
   }
 
   T* operator[](size_t row) {
-    return matrix_[row * cols_];
+    return matrix_ + row * cols_;
   }
 
   const T* operator[](size_t row) const {
-    return matrix_[row * cols_];
+    return matrix_ + row * cols_;
   }
 
   T& at(size_t row, size_t col) {
     CheckIndex(row, col);
-    return matrix_[row][col];
+    return (*this)[row][col];
   }
 
   const T& at(size_t row, size_t col) const {
     CheckIndex(row, col);
-    return matrix_[row][col];
+    return (*this)[row][col];
   }
 
   void SetRows(size_t rows) {
@@ -245,24 +246,24 @@ class Matrix {
     Swap(new_matrix);
   }
 
-  int GetRows() const {
+  size_t GetRows() const noexcept {
     return rows_;
   }
 
-  int GetCols() const {
+  size_t GetCols() const noexcept {
     return cols_;
   }
 
   Matrix Transpose() const {
-    Matrix transpose_matrix(cols_, rows_);
+    Matrix new_matrix(cols_, rows_);
 
     for (size_t i = 0; i < cols_; ++i) {
       for (size_t j = 0; j < rows_; ++j) {
-        transpose_matrix[i][j] = (*this)[j][i];
+        new_matrix[i][j] = (*this)[j][i];
       }
     }
 
-    return transpose_matrix;
+    return new_matrix;
   }
 
   Matrix CalcComplements() const {
@@ -272,24 +273,23 @@ class Matrix {
       throw std::invalid_argument("Determinant is equal to 0");
     }
 
-    Matrix calc_complements_matrix(rows_, cols_);
-
+    Matrix new_matrix(rows_, cols_);
     for (size_t i = 0; i < rows_; ++i) {
       for (size_t j = 0; j < cols_; ++j) {
-        calc_complements_matrix[i][j] =
-            Minor(i, j).Determinant() * GetCalcComplementSign(i, j);
+        new_matrix[i][j] = Minor(i, j).Determinant() * GetCalcComplementSign(i, j);
       }
     }
 
-    return calc_complements_matrix;
+    return new_matrix;
   }
 
   Matrix InverseMatrix() const {
     CheckSquareMatrix();
 
-    Matrix inverse_matrix(*this);
-    inverse_matrix *= 1 / CalcComplements().Transpose().Determinant();
-    return inverse_matrix;
+    Matrix new_matrix(*this);
+    new_matrix *= 1 / CalcComplements().Transpose().Determinant();
+    
+    return new_matrix;
   }
 
   Matrix Minor(size_t row, size_t col) const {
@@ -336,8 +336,8 @@ class Matrix {
   }
 
 private:
-  void DestroyMatrix(int count_constructed_elements) noexcept {
-    for (size_t i = 0; i < count_constructed_elements; ++i) {
+  void DestroyMatrix(size_t constructed_count) noexcept {
+    for (size_t i = 0; i < constructed_count; ++i) {
         AllocatorTraits::destroy(alloc_, matrix_ + i);
     }
     AllocatorTraits::deallocate(alloc_, matrix_, rows_ * cols_);
