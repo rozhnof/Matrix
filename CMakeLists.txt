@@ -17,10 +17,10 @@ file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS
     "tests/*.cc"
 )
 
-add_library(matrix INTERFACE)
-target_sources(matrix INTERFACE ${HEADER_FILE_LIST})
+add_library(${PROJECT_NAME} INTERFACE)
+target_sources(${PROJECT_NAME} INTERFACE ${HEADER_FILE_LIST})
 
 if(BUILD_TESTS)
-    add_executable(${PROJECT_NAME}-test ${TEST_FILES})
-    target_link_libraries(${PROJECT_NAME}-test PUBLIC matrix gtest gtest_main)
+    add_executable(${PROJECT_NAME}Test ${TEST_FILES})
+    target_link_libraries(${PROJECT_NAME}Test PUBLIC ${PROJECT_NAME} gtest gtest_main)
 endif()
