@@ -283,7 +283,7 @@ class Matrix {
       }
     }
 
-    Swap(new_matrix);
+    swap(new_matrix);
   }
 
   std::size_t GetRows() const noexcept {
