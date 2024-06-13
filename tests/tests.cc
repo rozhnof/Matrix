@@ -4,9 +4,8 @@
 #include <new>
 #include <matrix.h>
 
-
 TEST(MatrixResize, Throw) {
-  struct Alloc: std::allocator<int> {
+  struct Alloc : std::allocator<int> {
     [[nodiscard]] int* allocate(std::size_t) {
       throw std::bad_alloc{};
       return nullptr;
@@ -18,6 +17,6 @@ TEST(MatrixResize, Throw) {
 }
 
 int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
