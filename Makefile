@@ -1,4 +1,4 @@
-PROJECT_NAME = Matrix
+PROJECT_NAME = matrix
 
 CPPCHECK_OPTIONS = --language=c++ --enable=all --inconclusive --suppress=missingIncludeSystem 
 SAN_OPTIONS = -D UBSAN=ON -D ASAN=ON
@@ -34,12 +34,12 @@ apply_format:
 test_release:
 	@cmake . -B ${BUILD_RELEASE_DIR} -D CMAKE_BUILD_TYPE=Release $(SAN_OPTIONS) -D BUILD_TESTS=ON
 	@cmake --build ${BUILD_RELEASE_DIR}
-	${BUILD_RELEASE_DIR}/$(PROJECT_NAME)Test
+	${BUILD_RELEASE_DIR}/$(PROJECT_NAME)-test
 
 test_debug:
 	@cmake . -B ${BUILD_DEBUG_DIR} -D CMAKE_BUILD_TYPE=Debug $(SAN_OPTIONS) -D BUILD_TESTS=ON
 	@cmake --build ${BUILD_DEBUG_DIR}
-	${BUILD_DEBUG_DIR}/$(PROJECT_NAME)Test
+	${BUILD_DEBUG_DIR}/$(PROJECT_NAME)-test
 
 clean:
 	rm -rf $(BUILD_RELEASE_DIR) $(BUILD_DEBUG_DIR) 

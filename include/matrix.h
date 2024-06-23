@@ -6,6 +6,7 @@
 #include <ostream>
 #include <memory>
 #include <type_traits>
+#include <utility>
 
 template <typename T, typename Allocator = std::allocator<T>>
 class Matrix {
@@ -52,8 +53,8 @@ class Matrix {
     CheckMatrix();
 
     std::size_t i = 0;
+    matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
     try {
-      matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         allocator_traits::construct(alloc_, matrix_ + i, value);
       }
@@ -73,8 +74,8 @@ class Matrix {
         matrix_(nullptr),
         alloc_(allocator_type()) {
     std::size_t i = 0;
+    matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
     try {
-      matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         auto rows_it = init_list.begin() + i / cols_;
         auto cols_it = rows_it->begin() + i % cols_;
@@ -100,8 +101,8 @@ class Matrix {
         matrix_(nullptr),
         alloc_(allocator_traits::select_on_container_copy_construction(alloc)) {
     std::size_t i = 0;
+    matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
     try {
-      matrix_ = allocator_traits::allocate(alloc_, rows_ * cols_);
       for (; i < rows_ * cols_; ++i) {
         allocator_traits::construct(alloc_, matrix_ + i, other.matrix_[i]);
       }
@@ -116,9 +117,43 @@ class Matrix {
       return *this;
     }
 
-    Matrix copy(other);
-    SwapFields(copy);
-    alloc_ = copy.alloc_;
+    if constexpr (allocator_traits::is_always_equal::value && noexcept(std::is_nothrow_copy_constructible_v<T>)) {
+      if ((rows_ * cols_) == (other.cols_ * other.rows_)) {
+        for (std::size_t i = 0; i < rows_ * cols_; ++i) {
+          allocator_traits::destroy(alloc_, matrix_ + i);
+          allocator_traits::construct(alloc_, matrix_ + i, other.matrix_[i]);
+        }
+        return *this;
+      }
+    }
+
+    Allocator new_alloc = allocator_traits::select_on_container_copy_construction(other.GetAllocator());
+
+    std::size_t i = 0;
+    T* new_matrix = allocator_traits::allocate(new_alloc, other.cols_ * other.rows_);
+    try {
+      for (; i < other.cols_ * other.rows_; ++i) {
+        allocator_traits::construct(new_alloc, new_matrix + i, other.matrix_[i]);
+      }
+    } catch (...) {
+      for (std::size_t j = 0; j < i; ++j) {
+        allocator_traits::destroy(new_alloc, new_matrix + j);
+      }
+      allocator_traits::deallocate(new_alloc, new_matrix, rows_ * cols_);
+      throw;
+    }
+
+    for (std::size_t j = 0; j < rows_ * cols_; ++j) {
+      allocator_traits::destroy(alloc_, matrix_ + j);
+    }
+    allocator_traits::deallocate(alloc_, matrix_, rows_ * cols_);
+
+    matrix_ = new_matrix;
+    rows_ = other.rows_;
+    cols_ = other.cols_;
+    alloc_ = new_alloc;
+
+    return *this;
   }
 
   Matrix(Matrix&& other) noexcept(noexcept(allocator_type()))
@@ -396,39 +431,39 @@ class Matrix {
   }
 
   const_iterator begin() const noexcept {
-    return begin();
+    return matrix_;
   }
 
   const_iterator end() const noexcept {
-    return end();
+    return matrix_ + (rows_ * cols_);
   }
 
   const_iterator cbegin() const noexcept {
-    return begin();
+    return matrix_;
   }
   const_iterator cend() const noexcept {
-    return end();
+    return matrix_ + (rows_ * cols_);
   }
 
   reverse_iterator rbegin() noexcept {
-    return matrix_ + (rows_ * cols_) - 1;
+    return std::make_reverse_iterator(end());
   }
   reverse_iterator rend() noexcept {
-    return matrix_ + 1;
+    return std::make_reverse_iterator(begin());
   }
 
   const_reverse_iterator rbegin() const noexcept {
-    return rbegin();
+    return std::make_reverse_iterator(end());
   }
   const_reverse_iterator rend() const noexcept {
-    return rend();
+    return std::make_reverse_iterator(end());
   }
 
   const_reverse_iterator crbegin() const noexcept {
-    return rbegin();
+    return std::make_reverse_iterator(end());
   }
   const_reverse_iterator crend() const noexcept {
-    return rend();
+    return std::make_reverse_iterator(end());
   }
 
  private:

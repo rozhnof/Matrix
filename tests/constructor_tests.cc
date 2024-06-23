@@ -47,11 +47,10 @@ struct BadAlloc : std::allocator<T> {
 };
 
 TEST(Constructor, Ctor1) {
-  Matrix<int> matrix;
+  Matrix<int, Allocator<int>> matrix;
   EXPECT_EQ(matrix.GetCols(), 0);
   EXPECT_EQ(matrix.GetRows(), 0);
-  EXPECT_EQ(static_cast<Allocator<int>>(matrix.GetAllocator()).memory_allocated,
-            0);
+  EXPECT_EQ(matrix.GetAllocator().memory_allocated, 0);
 }
 
 TEST(Constructor, Ctor2) {

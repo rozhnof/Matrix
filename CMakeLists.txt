@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(Matrix CXX)
+project(matrix CXX)
 
 include(cmake/CompileOptions.cmake)
 include(cmake/Sanitize.cmake)
@@ -20,7 +20,8 @@ file(GLOB_RECURSE TEST_FILES CONFIGURE_DEPENDS
 add_library(${PROJECT_NAME} INTERFACE)
 target_sources(${PROJECT_NAME} INTERFACE ${HEADER_FILE_LIST})
 
+
 if(BUILD_TESTS)
-    add_executable(${PROJECT_NAME}Test ${TEST_FILES})
-    target_link_libraries(${PROJECT_NAME}Test PUBLIC ${PROJECT_NAME} gtest gtest_main)
+    add_executable(${PROJECT_NAME}-test ${TEST_FILES})
+    target_link_libraries(${PROJECT_NAME}-test PUBLIC ${PROJECT_NAME} gtest gtest_main)
 endif()
