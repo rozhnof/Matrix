@@ -156,21 +156,19 @@ class Matrix {
     return *this;
   }
 
-  Matrix(Matrix&& other) noexcept(noexcept(allocator_type()))
-      : Matrix() {
-    SwapFields(other);
-    alloc_ = std::move(other.alloc_);
+  Matrix(Matrix&& other) noexcept(noexcept(allocator_type())): Matrix(std::move(other), other.alloc_) {}
+
+  Matrix(Matrix&& other, const allocator_type& alloc) noexcept requires(allocator_traits::is_always_equal::value)
+      : matrix_(other.matrix_), rows_(other.rows_), cols_(other.cols_), alloc_(alloc) {
+    other.matrix_ = nullptr;
+    other.cols_ = 0;
+    other.rows_ = 0;
   }
 
-  Matrix(Matrix&& other, const allocator_type& alloc)
-      : Matrix() {
-    if constexpr (allocator_traits::is_always_equal::value) {
-      SwapFields(other);
-    } else {
-      Matrix copy(other);
-      SwapFields(copy);
-    }
-    alloc_ = alloc;
+  Matrix(Matrix&& other, const allocator_type& alloc): Matrix(other, alloc) {
+    other.matrix_ = nullptr;
+    other.cols_ = 0;
+    other.rows_ = 0;
   }
 
   Matrix& operator=(Matrix&& other) noexcept(
